@@ -26,56 +26,62 @@ namespace DUOpakovani
 
     public class CircularLogBuffer
     {
-        private List<LogItem> buffer;
+        private LogItem[] buffer;
         private int bufferSize;
+        private int currentIndex;
 
         public event EventHandler<string> NewLogAdded;
 
         public CircularLogBuffer(int bufferSize)
         {
             this.bufferSize = bufferSize;
-            buffer = new List<LogItem>(bufferSize);
+            buffer = new LogItem[bufferSize];
+            currentIndex = 0;
         }
 
         public void ResizeBuffer(int newSize)
         {
-            // Zvětší/zmenší velikost bufferu
-            bufferSize = newSize;
+            // Vytvoří se nové pole s novou velikostí
+            LogItem[] newBuffer = new LogItem[newSize];
 
-            // Odstraní přebytečné položky z bufferu, pokud je nová velikost menší než aktuální počet položek
-            while (buffer.Count > newSize)
-            {
-                buffer.RemoveAt(0);
-            }
+            // Přesune se obsah stávajícího pole do nového pole
+            int minSize = Math.Min(newSize, bufferSize);
+            Array.Copy(buffer, newBuffer, minSize);
+
+            // Nastaví se nová velikost bufferu a buffer se přepíše na nové pole
+            bufferSize = newSize;
+            buffer = newBuffer;
         }
 
         public void ClearBuffer()
         {
-            // Vyčistí obsah bufferu
-            buffer.Clear();
+            // Vyčistí se obsah bufferu
+            Array.Clear(buffer, 0, bufferSize);
         }
 
         public void AddLog(DateTime timestamp, string content)
         {
-            // Přidá nový záznam do logu
-            buffer.Add(new LogItem(timestamp, content));
+            // Přidá se nový záznam do bufferu
+            buffer[currentIndex] = new LogItem(timestamp, content);
 
-            // Zkontroluje, zda byl překročen maximální počet záznamů v bufferu
-            if (buffer.Count > bufferSize)
-            {
-                // Pokud ano, odstraní nejstarší záznam
-                buffer.RemoveAt(0);
-            }
+            // Inkrementuje se index a zkontroluje se, zda index nepřekročil velikost bufferu
+            currentIndex = (currentIndex + 1) % bufferSize;
 
-            // Vyvolá událost s obsahem nového záznamu
+            // Vyvolá se událost s obsahem nového záznamu
             NewLogAdded?.Invoke(this, content);
         }
 
-        public List<LogItem> GetLogs()
+        public LogItem[] GetLogs()
         {
-            // Vrátí seznam logů seřazených sestupně podle časového razítka
-            buffer.Sort();
-            return buffer;
+            // Vytvoří se kopie pole
+            LogItem[] copy = new LogItem[bufferSize];
+            Array.Copy(buffer, copy, bufferSize);
+
+            // Seřadí se záznamy podle časového razítka
+            Array.Sort(copy);
+
+            // Vrátí se seřazené pole
+            return copy;
         }
     }
 
@@ -99,21 +105,22 @@ namespace DUOpakovani
             LogConsumer logConsumer = new LogConsumer();
             logBuffer.NewLogAdded += logConsumer.OnNewLogAdded;
 
-            // Přidání několika logů
-            logBuffer.AddLog(DateTime.Now, "První záznam");
-            logBuffer.AddLog(DateTime.Now, "Druhý záznam");
-            logBuffer.AddLog(DateTime.Now, "Třetí záznam");
-            logBuffer.AddLog(DateTime.Now, "Třetí záznam");
-            logBuffer.AddLog(DateTime.Now, "Třetí záznam");
-            logBuffer.AddLog(DateTime.Now, "Třetí záznam");
-            logBuffer.AddLog(DateTime.Now, "Třetí záznam");
-            logBuffer.AddLog(DateTime.Now, "Třetí záznam");
-            logBuffer.AddLog(DateTime.Now, "Třetí záznam");
-            logBuffer.AddLog(DateTime.Now, "Třetí záznam");
-            logBuffer.AddLog(DateTime.Now, "Třetí záznam");
+            while (true)
+            {
+                // Přidání logů
+                string input = Console.ReadLine();
+                if (input == "exit")
+                {
+                    break;
+                }
+                else
+                {
+                    logBuffer.AddLog(DateTime.Now, input);
+                }
+            }
 
             // Získání seznamu logů a jejich výpis
-            List<LogItem> logs = logBuffer.GetLogs();
+            LogItem[] logs = logBuffer.GetLogs();
             foreach (var log in logs)
             {
                 Console.WriteLine($"Čas: {log.Timestamp}, Obsah: {log.Content}");
